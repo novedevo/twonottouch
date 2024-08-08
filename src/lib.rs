@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display, usize};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Board {
@@ -10,12 +10,17 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(width: usize, height: usize, cells: Vec<Vec<Cell>>) -> Self {
+    pub fn new(width: usize, height: usize, regions: Vec<Vec<usize>>) -> Self {
+        let cells = Self::blank_from_regions(regions);
         let cells_by_region = cells
             .iter()
-            .flat_map(|row| row.iter().enumerate())
             .enumerate()
-            .map(|(row, (col, &cell))| (cell.region, (row, col)));
+            .flat_map(|(row_index, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(move |(col_index, cell)| (cell.region, (row_index, col_index)))
+            })
+            .collect::<Vec<_>>();
 
         let mut regional_map: HashMap<usize, Vec<_>> = HashMap::new();
         for (region, coords) in cells_by_region {
@@ -35,13 +40,32 @@ impl Board {
         }
     }
 
+    fn blank_from_regions(regions: Vec<Vec<usize>>) -> Vec<Vec<Cell>> {
+        regions
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|region| Cell {
+                        region,
+                        state: CellState::Blank,
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
     pub fn solve(&mut self) {
         let mut past_self = self.clone();
         loop {
+            //blackout before adding more stars
+
             self.blackout_cols();
             self.blackout_rows();
             self.blackout_regions();
             self.blackout_star_adjacencies();
+            self.eliminate_middle_of_small_empty_regions();
+
+            self.regenerate_regions();
 
             self.add_required_stars_cols();
             self.add_required_stars_rows();
@@ -52,6 +76,15 @@ impl Board {
             } else {
                 past_self = self.clone();
             }
+        }
+    }
+
+    pub fn print(&self) {
+        for row in &self.cells {
+            for cell in row {
+                print!("{}", cell.state);
+            }
+            println!();
         }
     }
 
@@ -85,7 +118,6 @@ impl Board {
             }
         }
     }
-
     fn blackout_cols(&mut self) {
         for col in 0..self.width {
             if self
@@ -102,7 +134,6 @@ impl Board {
             }
         }
     }
-
     fn blackout_regions(&mut self) {
         for region in &self.regions {
             if region
@@ -142,23 +173,33 @@ impl Board {
             .enumerate()
             .filter(|(_col, cell)| cell.state == CellState::Blank)
             .collect::<Vec<_>>();
+        let starcount = row
+            .iter()
+            .filter(|cell| cell.state == CellState::Star)
+            .count();
         let count = blanks.len();
 
-        if count == 2 {
+        if starcount == 0 {
+            if count <= 2 {
+                for cell in row {
+                    cell.star()
+                }
+            } else if count == 3 {
+                let cell = if blanks[1].0 - blanks[0].0 == 1 {
+                    Some(2)
+                } else if blanks[2].0 - blanks[1].0 == 1 {
+                    Some(0)
+                } else {
+                    None
+                };
+
+                if let Some(cell) = cell {
+                    row[cell].star();
+                }
+            }
+        } else if starcount == 1 && count == 1 {
             for cell in row {
                 cell.star()
-            }
-        } else if count == 3 {
-            let cell = if blanks[1].0 - blanks[0].0 == 1 {
-                Some(2)
-            } else if blanks[2].0 - blanks[1].0 == 1 {
-                Some(0)
-            } else {
-                None
-            };
-
-            if let Some(cell) = cell {
-                row[cell].star();
             }
         }
     }
@@ -167,17 +208,103 @@ impl Board {
         for region in &mut self.regions {
             let blanks = region
                 .iter()
-                .enumerate()
-                .filter(|(_col, (row, col))| self.cells[*row][*col].state == CellState::Blank)
+                .filter(|(row, col)| self.cells[*row][*col].state == CellState::Blank)
                 .collect::<Vec<_>>();
+            let starcount = region
+                .iter()
+                .filter(|(row, col)| self.cells[*row][*col].state == CellState::Star)
+                .count();
             let count = blanks.len();
 
-            if count == 2 {
+            if starcount == 0 {
+                if count <= 2 {
+                    for (row, col) in region {
+                        self.cells[*row][*col].star()
+                    }
+                } else if count == 3 {
+                    if adjacencies(self.width, self.height, blanks[0].0, blanks[0].1)
+                        .contains(blanks[1])
+                    {
+                        self.cells[blanks[2].0][blanks[2].1].star();
+                    } else if adjacencies(self.width, self.height, blanks[1].0, blanks[1].1)
+                        .contains(blanks[2])
+                    {
+                        self.cells[blanks[0].0][blanks[0].1].star();
+                    } else if adjacencies(self.width, self.height, blanks[0].0, blanks[0].1)
+                        .contains(blanks[2])
+                    {
+                        self.cells[blanks[1].0][blanks[1].1].star();
+                    }
+                }
+            } else if starcount == 1 && count == 1 {
                 for (row, col) in region {
                     self.cells[*row][*col].star()
                 }
             }
         }
+    }
+
+    fn eliminate_middle_of_small_empty_regions(&mut self) {
+        for region in &self.regions {
+            let starcount = self.regional_stars(region);
+            if region.is_empty() || starcount != 0 {
+                continue;
+            }
+
+            let mut min_row = usize::MAX;
+            let mut max_row = usize::MIN;
+            let mut min_col = usize::MAX;
+            let mut max_col = usize::MIN;
+
+            for (row, col) in region {
+                min_row = min_row.min(*row);
+                min_col = min_col.min(*col);
+                max_row = max_row.max(*row);
+                max_col = max_col.max(*col);
+            }
+            let area = (max_row - min_row) * (max_col - min_col);
+            let max_dimension = (max_row - min_row).max(max_col - min_col);
+            if area <= 6 && max_dimension <= 3 {
+                //small region detected :)
+                //time to find the middle
+                if max_dimension == max_row - min_row {
+                    let mid_row = max_row - 1;
+                    for (row, col) in region {
+                        if *row == mid_row {
+                            self.cells[*row][*col].shade()
+                        }
+                    }
+                } else {
+                    let mid_col = max_col - 1;
+                    for (row, col) in region {
+                        if *col == mid_col {
+                            self.cells[*row][*col].shade()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn regional_stars(&self, region: &Vec<(usize, usize)>) -> usize {
+        region
+            .iter()
+            .filter(|(row, col)| self.cells[*row][*col].state == CellState::Star)
+            .count()
+    }
+
+    fn regenerate_regions(&mut self) {
+        self.regions = self
+            .regions
+            .iter()
+            .map(|region| {
+                region
+                    .iter()
+                    .filter(|(row, col)| self.cells[*row][*col].state != CellState::Filled)
+                    .copied()
+                    .collect::<Vec<(usize, usize)>>()
+            })
+            .collect()
     }
 }
 
@@ -243,10 +370,66 @@ pub enum CellState {
     Filled,
 }
 
+impl Display for CellState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Blank => '-',
+                Self::Star => 'X',
+                Self::Filled => '#',
+            }
+        )
+    }
+}
+
 #[cfg(test)]
 mod test {
-
     use super::*;
+
+    #[test]
+    fn test_constructor() {
+        Board::new(
+            10,
+            10,
+            vec![
+                vec![0, 0, 0, 1, 1, 1, 1, 2, 2, 3],
+                vec![0, 0, 0, 1, 2, 2, 1, 2, 2, 3],
+                vec![0, 0, 0, 1, 2, 2, 2, 2, 2, 3],
+                vec![0, 0, 0, 0, 2, 2, 4, 4, 3, 3],
+                vec![5, 5, 4, 4, 4, 4, 4, 4, 3, 3],
+                vec![5, 5, 5, 5, 4, 6, 6, 6, 6, 3],
+                vec![5, 5, 7, 5, 5, 6, 6, 6, 6, 3],
+                vec![8, 8, 7, 7, 6, 6, 6, 6, 6, 3],
+                vec![8, 9, 9, 7, 7, 7, 7, 6, 6, 3],
+                vec![8, 9, 9, 9, 9, 7, 6, 6, 6, 6],
+            ],
+        );
+    }
+
+    #[test]
+    fn test_solve() {
+        let mut board = Board::new(
+            10,
+            10,
+            vec![
+                vec![0, 0, 0, 1, 1, 1, 1, 2, 2, 3],
+                vec![0, 0, 0, 1, 2, 2, 1, 2, 2, 3],
+                vec![0, 0, 0, 1, 2, 2, 2, 2, 2, 3],
+                vec![0, 0, 0, 0, 2, 2, 4, 4, 3, 3],
+                vec![5, 5, 4, 4, 4, 4, 4, 4, 3, 3],
+                vec![5, 5, 5, 5, 4, 6, 6, 6, 6, 3],
+                vec![5, 5, 7, 5, 5, 6, 6, 6, 6, 3],
+                vec![8, 8, 7, 7, 6, 6, 6, 6, 6, 3],
+                vec![8, 9, 9, 7, 7, 7, 7, 6, 6, 3],
+                vec![8, 9, 9, 9, 9, 7, 6, 6, 6, 6],
+            ],
+        );
+        board.solve();
+        board.print();
+    }
+
     #[test]
     fn test_adjacencies() {
         unordered_eq(adjacencies(10, 10, 10, 10), vec![]);
