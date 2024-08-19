@@ -215,7 +215,7 @@ impl Board {
                 };
 
                 if let Some(cell) = cell {
-                    row[cell].star();
+                    row[blanks[cell].0].star();
                 }
             }
         } else if starcount == 1 && count == 1 {
