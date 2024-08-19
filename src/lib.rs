@@ -56,17 +56,10 @@ impl Board {
 
     pub fn solve(&mut self) {
         let mut past_self = self.clone();
+        // self.enforce_rules();
         loop {
+            self.enforce_rules();
             //blackout before adding more stars
-
-            self.blackout_cols();
-            self.blackout_rows();
-            self.blackout_regions();
-            self.blackout_star_adjacencies();
-            self.eliminate_middle_of_small_empty_regions();
-
-            self.regenerate_regions();
-
             self.add_required_stars_cols();
             self.add_required_stars_rows();
             self.add_required_stars_region();
@@ -77,6 +70,24 @@ impl Board {
                 past_self = self.clone();
             }
         }
+    }
+
+    fn enforce_rules(&mut self) {
+        // let mut past_self = self.clone();
+        // loop {
+        self.blackout_cols();
+        self.blackout_rows();
+        self.blackout_regions();
+        self.blackout_star_adjacencies();
+        self.eliminate_middle_of_small_empty_regions();
+
+        self.regenerate_regions();
+        // if &past_self == self {
+        //     break;
+        // } else {
+        //     past_self = self.clone();
+        // }
+        // }
     }
 
     pub fn print(&self) {
@@ -148,6 +159,16 @@ impl Board {
                 }
             }
         }
+    }
+
+    fn add_star_coords(&mut self, row: usize, col: usize) {
+        self.cells[row][col].star();
+        self.enforce_rules();
+    }
+
+    fn add_star_cell(&mut self, cell: &mut Cell) {
+        cell.star();
+        self.enforce_rules();
     }
 
     fn add_required_stars_rows(&mut self) {
