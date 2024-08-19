@@ -197,11 +197,10 @@ impl Board {
             for col in 0..self.width {
                 if self.cells[row][col].state == CellState::Star {
                     for (row, col) in self.adjacencies(row, col) {
-                        let adj_cell = &mut self.cells[row][col];
-                        if adj_cell.state == CellState::Star {
+                        if self.cells[row][col].state == CellState::Star {
                             unreachable!();
                         }
-                        adj_cell.shade()
+                        self.shade_coords(row, col);
                     }
                 }
             }
@@ -366,12 +365,15 @@ impl Board {
 
     fn add_star_coords(&mut self, row: usize, col: usize) {
         self.cells[row][col].star();
+        #[cfg(test)]
+        self.assert_matches_with_solution();
         self.enforce_rules();
     }
 
-    fn add_star_cell(&mut self, cell: &mut Cell) {
-        cell.star();
-        self.enforce_rules();
+    fn shade_coords(&mut self, row: usize, col: usize) {
+        self.cells[row][col].shade();
+        #[cfg(test)]
+        self.assert_matches_with_solution();
     }
 
     fn add_required_stars_rows(&mut self) {
@@ -429,7 +431,7 @@ impl Board {
     }
 
     fn add_required_stars_region(&mut self) {
-        for region in &mut self.regions {
+        for region in self.regions.clone() {
             let blanks = region
                 .iter()
                 .filter(|(row, col)| self.cells[*row][*col].state == CellState::Blank)
@@ -443,26 +445,26 @@ impl Board {
             if starcount == 0 {
                 if count <= 2 {
                     for (row, col) in region {
-                        self.cells[*row][*col].star()
+                        self.add_star_coords(row, col);
                     }
                 } else if count == 3 {
                     if adjacencies(self.width, self.height, blanks[0].0, blanks[0].1)
                         .contains(blanks[1])
                     {
-                        self.cells[blanks[2].0][blanks[2].1].star();
+                        self.add_star_coords(blanks[2].0, blanks[2].1);
                     } else if adjacencies(self.width, self.height, blanks[1].0, blanks[1].1)
                         .contains(blanks[2])
                     {
-                        self.cells[blanks[0].0][blanks[0].1].star();
+                        self.add_star_coords(blanks[0].0, blanks[0].1);
                     } else if adjacencies(self.width, self.height, blanks[0].0, blanks[0].1)
                         .contains(blanks[2])
                     {
-                        self.cells[blanks[1].0][blanks[1].1].star();
+                        self.add_star_coords(blanks[1].0, blanks[1].1);
                     }
                 }
             } else if starcount == 1 && count == 1 {
                 for (row, col) in region {
-                    self.cells[*row][*col].star()
+                    self.add_star_coords(row, col);
                 }
             }
         }
@@ -470,8 +472,8 @@ impl Board {
 
     fn eliminate_middle_of_small_empty_regions(&mut self) {
         self.print();
-        for region in &self.regions {
-            let starcount = self.regional_stars(region);
+        for region in self.regions.clone() {
+            let starcount = self.regional_stars(&region);
             if region.is_empty() || starcount != 0 {
                 continue;
             }
@@ -482,10 +484,10 @@ impl Board {
             let mut max_col = usize::MIN;
 
             for (row, col) in region {
-                min_row = min_row.min(*row);
-                min_col = min_col.min(*col);
-                max_row = max_row.max(*row);
-                max_col = max_col.max(*col);
+                min_row = min_row.min(row);
+                min_col = min_col.min(col);
+                max_row = max_row.max(row);
+                max_col = max_col.max(col);
             }
             let width = max_col - min_col + 1;
             let height = max_row - min_row + 1;
@@ -496,43 +498,31 @@ impl Board {
                 if width <= height {
                     let mid_row = max_row - 1;
                     for col in min_col..=max_col {
-                        self.cells[mid_row][col].shade();
-                        #[cfg(test)]
-                        self.assert_matches_with_solution();
+                        self.shade_coords(mid_row, col);
                     }
                     if min_row != 0 {
                         for col in min_col..=max_col {
-                            self.cells[min_row - 1][col].shade();
-                            #[cfg(test)]
-                            self.assert_matches_with_solution();
+                            self.shade_coords(min_row - 1, col);
                         }
                     }
                     if max_row < self.height - 1 {
                         for col in min_col..=max_col {
-                            self.cells[max_row + 1][col].shade();
-                            #[cfg(test)]
-                            self.assert_matches_with_solution();
+                            self.shade_coords(max_row + 1, col);
                         }
                     }
                 } else {
                     let mid_col = max_col - 1;
                     for row in min_row..=max_row {
-                        self.cells[row][mid_col].shade();
-                        #[cfg(test)]
-                        self.assert_matches_with_solution();
+                        self.shade_coords(row, mid_col);
                     }
                     if min_col != 0 {
                         for row in min_row..=max_row {
-                            self.cells[row][min_col - 1].shade();
-                            #[cfg(test)]
-                            self.assert_matches_with_solution();
+                            self.shade_coords(row, min_col - 1);
                         }
                     }
                     if max_col < self.width - 1 {
                         for row in min_row..=max_row {
-                            self.cells[row][max_col + 1].shade();
-                            #[cfg(test)]
-                            self.assert_matches_with_solution();
+                            self.shade_coords(row, max_col + 1);
                         }
                     }
                 }
