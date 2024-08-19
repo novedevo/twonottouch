@@ -406,16 +406,32 @@ impl Board {
                 //todo: also shade extraregional cells in the middle
                 if width <= height {
                     let mid_row = max_row - 1;
-                    for (row, col) in region {
-                        if *row == mid_row {
-                            self.cells[*row][*col].shade()
+                    for col in min_col..=max_col {
+                        self.cells[mid_row][col].shade();
+                    }
+                    if min_row != 0 {
+                        for col in min_col..=max_col {
+                            self.cells[min_row - 1][col].shade();
+                        }
+                    }
+                    if max_row < self.height - 1 {
+                        for col in min_col..=max_col {
+                            self.cells[max_row + 1][col].shade();
                         }
                     }
                 } else {
                     let mid_col = max_col - 1;
-                    for (row, col) in region {
-                        if *col == mid_col {
-                            self.cells[*row][*col].shade()
+                    for row in min_row..=max_row {
+                        self.cells[row][mid_col].shade();
+                    }
+                    if min_col != 0 {
+                        for row in min_row..=max_row {
+                            self.cells[min_col - 1][row].shade();
+                        }
+                    }
+                    if max_col < self.width - 1 {
+                        for row in min_row..=max_row {
+                            self.cells[max_col + 1][row].shade();
                         }
                     }
                 }
