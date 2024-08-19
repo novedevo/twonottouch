@@ -73,21 +73,21 @@ impl Board {
     }
 
     fn enforce_rules(&mut self) {
-        // let mut past_self = self.clone();
-        // loop {
-        self.blackout_cols();
-        self.blackout_rows();
-        self.blackout_regions();
-        self.blackout_star_adjacencies();
-        self.eliminate_middle_of_small_empty_regions();
+        let mut past_self = self.clone();
+        loop {
+            self.blackout_cols();
+            self.blackout_rows();
+            self.blackout_regions();
+            self.blackout_star_adjacencies();
+            self.eliminate_middle_of_small_empty_regions();
 
-        self.regenerate_regions();
-        // if &past_self == self {
-        //     break;
-        // } else {
-        //     past_self = self.clone();
-        // }
-        // }
+            self.regenerate_regions();
+            if &past_self == self {
+                break;
+            } else if true {
+                past_self = self.clone();
+            }
+        }
     }
 
     pub fn print(&self) {
@@ -283,12 +283,14 @@ impl Board {
                 max_row = max_row.max(*row);
                 max_col = max_col.max(*col);
             }
-            let area = (max_row - min_row) * (max_col - min_col);
-            let max_dimension = (max_row - min_row).max(max_col - min_col);
-            if area <= 6 && max_dimension <= 3 {
+            let width = max_col - min_col + 1;
+            let height = max_row - min_row + 1;
+            let area = width * height;
+            if area <= 6 && width <= 3 && height <= 3 {
                 //small region detected :)
                 //time to find the middle
-                if max_dimension == max_row - min_row {
+                //todo: also shade extraregional cells in the middle
+                if width <= height {
                     let mid_row = max_row - 1;
                     for (row, col) in region {
                         if *row == mid_row {
