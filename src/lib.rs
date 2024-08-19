@@ -286,7 +286,7 @@ impl Board {
         }
     }
 
-    fn regional_stars(&self, region: &Vec<(usize, usize)>) -> usize {
+    fn regional_stars(&self, region: &[(usize, usize)]) -> usize {
         region
             .iter()
             .filter(|(row, col)| self.cells[*row][*col].state == CellState::Star)
@@ -388,8 +388,7 @@ impl Display for CellState {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_constructor() {
+    fn test_board_sample() -> Board {
         Board::new(
             10,
             10,
@@ -405,29 +404,43 @@ mod test {
                 vec![8, 9, 9, 7, 7, 7, 7, 6, 6, 3],
                 vec![8, 9, 9, 9, 9, 7, 6, 6, 6, 6],
             ],
-        );
+        )
+    }
+    fn test_board_stolen_1() -> Board {
+        Board::new(
+            10,
+            10,
+            vec![
+                vec![0, 0, 1, 1, 2, 2, 2, 3, 3, 3],
+                vec![0, 0, 1, 2, 2, 2, 2, 3, 2, 3],
+                vec![0, 0, 1, 1, 1, 1, 2, 2, 2, 3],
+                vec![0, 1, 1, 1, 4, 4, 5, 2, 2, 2],
+                vec![0, 1, 1, 1, 4, 5, 5, 5, 5, 2],
+                vec![0, 6, 6, 6, 4, 4, 4, 4, 2, 2],
+                vec![7, 6, 7, 7, 4, 4, 4, 8, 8, 2],
+                vec![7, 7, 7, 7, 4, 9, 9, 9, 8, 2],
+                vec![7, 7, 7, 8, 8, 8, 8, 8, 8, 2],
+                vec![7, 7, 7, 8, 8, 8, 8, 8, 8, 8],
+            ],
+        )
+    }
+
+    #[test]
+    fn test_constructor() {
+        test_board_sample();
     }
 
     #[test]
     fn test_solve() {
-        let mut board = Board::new(
-            10,
-            10,
-            vec![
-                vec![0, 0, 0, 1, 1, 1, 1, 2, 2, 3],
-                vec![0, 0, 0, 1, 2, 2, 1, 2, 2, 3],
-                vec![0, 0, 0, 1, 2, 2, 2, 2, 2, 3],
-                vec![0, 0, 0, 0, 2, 2, 4, 4, 3, 3],
-                vec![5, 5, 4, 4, 4, 4, 4, 4, 3, 3],
-                vec![5, 5, 5, 5, 4, 6, 6, 6, 6, 3],
-                vec![5, 5, 7, 5, 5, 6, 6, 6, 6, 3],
-                vec![8, 8, 7, 7, 6, 6, 6, 6, 6, 3],
-                vec![8, 9, 9, 7, 7, 7, 7, 6, 6, 3],
-                vec![8, 9, 9, 9, 9, 7, 6, 6, 6, 6],
-            ],
-        );
+        // let mut board = test_board_sample();
+        // board.solve();
+        // board.print();
+        let mut board = test_board_stolen_1();
         board.solve();
         board.print();
+        // let mut board = test_board_sample();
+        // board.solve();
+        // board.print();
     }
 
     #[test]
