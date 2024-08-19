@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, usize};
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Board {
@@ -7,6 +7,8 @@ pub struct Board {
     cells: Vec<Vec<Cell>>,
     /// indexable by region tag
     regions: Vec<Vec<(usize, usize)>>,
+    #[cfg(test)]
+    solution: Option<Box<Board>>,
 }
 
 impl Board {
@@ -29,7 +31,7 @@ impl Board {
         let mut tagged_regions = regional_map.into_iter().collect::<Vec<_>>();
         tagged_regions.sort();
 
-        Self {
+        let result = Self {
             width,
             height,
             cells,
@@ -37,7 +39,51 @@ impl Board {
                 .into_iter()
                 .map(|(_region, cells)| cells)
                 .collect(),
+            #[cfg(test)]
+            solution: None,
+        };
+        result.print();
+        result
+    }
+
+    #[cfg(test)]
+    pub fn solved(width: usize, height: usize, stars: Vec<(usize, usize)>) -> Self {
+        let mut cells = vec![
+            vec![
+                Cell {
+                    region: 0,
+                    state: CellState::Filled
+                };
+                10
+            ];
+            10
+        ];
+        for row in 0..height {
+            let (star1, star2) = stars[row];
+            cells[row][star1] = Cell {
+                region: 0,
+                state: CellState::Star,
+            };
+            cells[row][star2] = Cell {
+                region: 0,
+                state: CellState::Star,
+            };
         }
+        let result = Self {
+            width,
+            height,
+            cells,
+            regions: vec![],
+            #[cfg(test)]
+            solution: None,
+        };
+        result.print();
+        result
+    }
+
+    #[cfg(test)]
+    pub fn add_solution(&mut self, solution: Self) {
+        self.solution = Some(Box::new(solution));
     }
 
     fn blank_from_regions(regions: Vec<Vec<usize>>) -> Vec<Vec<Cell>> {
@@ -56,18 +102,20 @@ impl Board {
 
     pub fn solve(&mut self) {
         let mut past_self = self.clone();
-        // self.enforce_rules();
         loop {
             self.enforce_rules();
             //blackout before adding more stars
             self.add_required_stars_cols();
+            self.enforce_rules();
             self.add_required_stars_rows();
+            self.enforce_rules();
             self.add_required_stars_region();
 
             if &past_self == self {
                 break;
             } else {
                 past_self = self.clone();
+                self.print();
             }
         }
     }
@@ -75,18 +123,54 @@ impl Board {
     fn enforce_rules(&mut self) {
         let mut past_self = self.clone();
         loop {
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.blackout_cols();
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.blackout_rows();
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.blackout_regions();
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.blackout_star_adjacencies();
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.blackout_next_to_contiguity();
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             self.eliminate_middle_of_small_empty_regions();
 
             self.regenerate_regions();
+
+            #[cfg(test)]
+            self.assert_matches_with_solution();
             if &past_self == self {
                 break;
             } else if true {
                 past_self = self.clone();
+                self.print();
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn assert_matches_with_solution(&self) {
+        if let Some(solution) = &self.solution {
+            for row in 0..self.height {
+                for col in 0..self.width {
+                    if self.cells[row][col].state != CellState::Blank
+                        && self.cells[row][col].state != solution.cells[row][col].state
+                    {
+                        eprintln!(
+                            "failed to match state: self followed by solution at {row}, {col}"
+                        );
+                        self.print();
+                        solution.print();
+                        panic!();
+                    }
+                }
             }
         }
     }
@@ -101,6 +185,7 @@ impl Board {
             }
             println!();
         }
+        println!();
     }
 
     fn adjacencies(&self, row: usize, col: usize) -> Vec<(usize, usize)> {
@@ -112,7 +197,11 @@ impl Board {
             for col in 0..self.width {
                 if self.cells[row][col].state == CellState::Star {
                     for (row, col) in self.adjacencies(row, col) {
-                        self.cells[row][col].shade()
+                        let adj_cell = &mut self.cells[row][col];
+                        if adj_cell.state == CellState::Star {
+                            unreachable!();
+                        }
+                        adj_cell.shade()
                     }
                 }
             }
@@ -380,6 +469,7 @@ impl Board {
     }
 
     fn eliminate_middle_of_small_empty_regions(&mut self) {
+        self.print();
         for region in &self.regions {
             let starcount = self.regional_stars(region);
             if region.is_empty() || starcount != 0 {
@@ -403,35 +493,46 @@ impl Board {
             if area <= 6 && width <= 3 && height <= 3 {
                 //small region detected :)
                 //time to find the middle
-                //todo: also shade extraregional cells in the middle
                 if width <= height {
                     let mid_row = max_row - 1;
                     for col in min_col..=max_col {
                         self.cells[mid_row][col].shade();
+                        #[cfg(test)]
+                        self.assert_matches_with_solution();
                     }
                     if min_row != 0 {
                         for col in min_col..=max_col {
                             self.cells[min_row - 1][col].shade();
+                            #[cfg(test)]
+                            self.assert_matches_with_solution();
                         }
                     }
                     if max_row < self.height - 1 {
                         for col in min_col..=max_col {
                             self.cells[max_row + 1][col].shade();
+                            #[cfg(test)]
+                            self.assert_matches_with_solution();
                         }
                     }
                 } else {
                     let mid_col = max_col - 1;
                     for row in min_row..=max_row {
                         self.cells[row][mid_col].shade();
+                        #[cfg(test)]
+                        self.assert_matches_with_solution();
                     }
                     if min_col != 0 {
                         for row in min_row..=max_row {
-                            self.cells[min_col - 1][row].shade();
+                            self.cells[row][min_col - 1].shade();
+                            #[cfg(test)]
+                            self.assert_matches_with_solution();
                         }
                     }
                     if max_col < self.width - 1 {
                         for row in min_row..=max_row {
-                            self.cells[max_col + 1][row].shade();
+                            self.cells[row][max_col + 1].shade();
+                            #[cfg(test)]
+                            self.assert_matches_with_solution();
                         }
                     }
                 }
@@ -577,10 +678,28 @@ mod test {
             ],
         )
     }
+    fn solved_board_stolen_1() -> Board {
+        Board::solved(
+            10,
+            10,
+            vec![
+                (1, 3),
+                (5, 7),
+                (2, 9),
+                (4, 6),
+                (0, 8),
+                (3, 6),
+                (1, 9),
+                (5, 7),
+                (0, 2),
+                (4, 8),
+            ],
+        )
+    }
 
     #[test]
     fn test_constructor() {
-        test_board_sample();
+        test_board_stolen_1();
     }
 
     #[test]
@@ -589,6 +708,8 @@ mod test {
         // board.solve();
         // board.print();
         let mut board = test_board_stolen_1();
+        let solution = solved_board_stolen_1();
+        board.add_solution(solution);
         board.solve();
         board.print();
         // let mut board = test_board_sample();
