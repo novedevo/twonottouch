@@ -187,6 +187,13 @@ impl Board {
                     self.cells[row + 1][blanks[0]].shade();
                     self.cells[row + 1][blanks[1]].shade();
                 }
+            } else if blanks.len() == 3 && starcount == 1 && blanks[2] - blanks[0] == 2 {
+                if row != 0 {
+                    self.cells[row - 1][blanks[1]].shade();
+                }
+                if row < self.height - 1 {
+                    self.cells[row + 1][blanks[1]].shade();
+                }
             } else if blanks.len() == 4 && starcount == 0 {
                 if blanks[1] - blanks[0] == 1 {
                     if row != 0 {
@@ -234,6 +241,13 @@ impl Board {
                 }
                 if col < self.width - 1 {
                     self.cells[blanks[0]][col + 1].shade();
+                    self.cells[blanks[1]][col + 1].shade();
+                }
+            } else if blanks.len() == 3 && starcount == 1 && blanks[2] - blanks[0] == 2 {
+                if col != 0 {
+                    self.cells[blanks[1]][col - 1].shade();
+                }
+                if col < self.width - 1 {
                     self.cells[blanks[1]][col + 1].shade();
                 }
             } else if blanks.len() == 4 && starcount == 0 {
