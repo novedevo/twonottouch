@@ -79,6 +79,7 @@ impl Board {
             self.blackout_rows();
             self.blackout_regions();
             self.blackout_star_adjacencies();
+            self.blackout_next_to_contiguity();
             self.eliminate_middle_of_small_empty_regions();
 
             self.regenerate_regions();
@@ -93,7 +94,10 @@ impl Board {
     pub fn print(&self) {
         for row in &self.cells {
             for cell in row {
-                print!("{}", cell.state);
+                match cell.state {
+                    CellState::Star | CellState::Filled => print!("{} ", cell.state),
+                    CellState::Blank => print!("{} ", cell.region),
+                }
             }
             println!();
         }
@@ -156,6 +160,102 @@ impl Board {
             {
                 for (row, col) in region {
                     self.cells[*row][*col].shade()
+                }
+            }
+        }
+    }
+
+    fn blackout_next_to_contiguity(&mut self) {
+        for row in 0..self.height {
+            let blanks = self.cells[row]
+                .iter()
+                .enumerate()
+                .filter(|(_col, cell)| cell.state == CellState::Blank)
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>();
+            let starcount = self.cells[row]
+                .iter()
+                .filter(|cell| cell.state == CellState::Star)
+                .count();
+
+            if blanks.len() == 2 && starcount == 1 && blanks[1] - blanks[0] == 1 {
+                if row != 0 {
+                    self.cells[row - 1][blanks[0]].shade();
+                    self.cells[row - 1][blanks[1]].shade();
+                }
+                if row < self.height - 1 {
+                    self.cells[row + 1][blanks[0]].shade();
+                    self.cells[row + 1][blanks[1]].shade();
+                }
+            } else if blanks.len() == 4 && starcount == 0 {
+                if blanks[1] - blanks[0] == 1 {
+                    if row != 0 {
+                        self.cells[row - 1][blanks[0]].shade();
+                        self.cells[row - 1][blanks[1]].shade();
+                    }
+                    if row < self.height - 1 {
+                        self.cells[row + 1][blanks[0]].shade();
+                        self.cells[row + 1][blanks[1]].shade();
+                    }
+                }
+                if blanks[3] - blanks[2] == 1 {
+                    if row != 0 {
+                        self.cells[row - 1][blanks[2]].shade();
+                        self.cells[row - 1][blanks[3]].shade();
+                    }
+                    if row < self.height - 1 {
+                        self.cells[row + 1][blanks[2]].shade();
+                        self.cells[row + 1][blanks[3]].shade();
+                    }
+                }
+            }
+        }
+
+        for col in 0..self.width {
+            let blanks = self
+                .cells
+                .iter_mut()
+                .map(|row| &mut row[col])
+                .enumerate()
+                .filter(|(_col, cell)| cell.state == CellState::Blank)
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>();
+            let starcount = self
+                .cells
+                .iter_mut()
+                .map(|row| &mut row[col])
+                .filter(|cell| cell.state == CellState::Star)
+                .count();
+
+            if blanks.len() == 2 && starcount == 1 && blanks[1] - blanks[0] == 1 {
+                if col != 0 {
+                    self.cells[blanks[0]][col - 1].shade();
+                    self.cells[blanks[1]][col - 1].shade();
+                }
+                if col < self.width - 1 {
+                    self.cells[blanks[0]][col + 1].shade();
+                    self.cells[blanks[1]][col + 1].shade();
+                }
+            } else if blanks.len() == 4 && starcount == 0 {
+                if blanks[1] - blanks[0] == 1 {
+                    if col != 0 {
+                        self.cells[blanks[0]][col - 1].shade();
+                        self.cells[blanks[1]][col - 1].shade();
+                    }
+                    if col < self.width - 1 {
+                        self.cells[blanks[0]][col + 1].shade();
+                        self.cells[blanks[1]][col + 1].shade();
+                    }
+                }
+                if blanks[3] - blanks[2] == 1 {
+                    if col != 0 {
+                        self.cells[blanks[2]][col - 1].shade();
+                        self.cells[blanks[3]][col - 1].shade();
+                    }
+                    if col < self.width - 1 {
+                        self.cells[blanks[2]][col + 1].shade();
+                        self.cells[blanks[3]][col + 1].shade();
+                    }
                 }
             }
         }
